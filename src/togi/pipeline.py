@@ -1,0 +1,107 @@
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+from typing import Callable
+
+import numpy as np
+
+from . import imageio, steps
+from .config import Config
+from .errors import TogiError
+
+SUPPORTED_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
+
+
+def sprite_pipeline(
+    img: np.ndarray, *, size: int, palette_rgb: np.ndarray
+) -> np.ndarray:
+    img = steps.bg_remove(img)
+    img = steps.cleanup(img)
+    img = steps.crop_bbox(img)
+    img = steps.fit(img, size=size)
+    img = steps.outline(img)
+    img = steps.palette_snap(img, palette_rgb=palette_rgb)
+    return img
+
+
+def background_pipeline(
+    img: np.ndarray, *, palette_rgb: np.ndarray
+) -> np.ndarray:
+    img = steps.bg_remove(img)
+    img = steps.cleanup(img)
+    img = steps.palette_snap(img, palette_rgb=palette_rgb)
+    return img
+
+
+def _output_path(cfg: Config, rel: Path) -> Path:
+    return cfg.output / rel.with_suffix(".png")
+
+
+def _is_up_to_date(src: Path, dst: Path) -> bool:
+    return dst.exists() and dst.stat().st_mtime >= src.stat().st_mtime
+
+
+def _process_one(
+    src: Path,
+    dst: Path,
+    pipeline: Callable[[np.ndarray], np.ndarray],
+) -> None:
+    img = imageio.load(src)
+    out = pipeline(img)
+    imageio.save(out, dst)
+
+
+def run_single(
+    cfg: Config,
+    pipeline: Callable[[np.ndarray], np.ndarray],
+    input_name: str,
+    output_name: str | None,
+    *,
+    force: bool,
+) -> int:
+    src = cfg.input / input_name
+    if not src.exists():
+        raise TogiError(f"input file not found: {src}")
+    rel = Path(output_name) if output_name else Path(input_name)
+    dst = cfg.output / rel.with_suffix(".png")
+    if not force and _is_up_to_date(src, dst):
+        return 0
+    try:
+        _process_one(src, dst, pipeline)
+    except TogiError as e:
+        print(f"{src}: {e}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def run_batch(
+    cfg: Config,
+    pipeline: Callable[[np.ndarray], np.ndarray],
+    *,
+    force: bool,
+) -> int:
+    if not cfg.input.exists():
+        raise TogiError(f"input directory not found: {cfg.input}")
+
+    failures = 0
+    found_any = False
+    for src in sorted(cfg.input.rglob("*")):
+        if not src.is_file():
+            continue
+        if src.suffix.lower() not in SUPPORTED_EXTS:
+            continue
+        found_any = True
+        rel = src.relative_to(cfg.input)
+        dst = _output_path(cfg, rel)
+        if not force and _is_up_to_date(src, dst):
+            continue
+        try:
+            _process_one(src, dst, pipeline)
+        except TogiError as e:
+            print(f"{src}: {e}", file=sys.stderr)
+            failures += 1
+
+    if not found_any:
+        print(f"no input images found in {cfg.input}", file=sys.stderr)
+    return 1 if failures else 0
