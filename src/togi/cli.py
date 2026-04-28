@@ -39,19 +39,26 @@ def _build_parser() -> argparse.ArgumentParser:
         help="overwrite source files instead of writing to output/",
     )
 
+    def add_step_io(s: argparse.ArgumentParser) -> None:
+        s.add_argument("input")
+        s.add_argument("output", nargs="?", default=None)
+        s.add_argument(
+            "-i",
+            "--in-place",
+            action="store_true",
+            help="overwrite input in place; input may be a file or directory",
+        )
+
     for name in ("bg-remove", "cleanup", "crop-bbox", "outline"):
         s = sub.add_parser(name, help=f"run only the {name} step")
-        s.add_argument("input")
-        s.add_argument("output")
+        add_step_io(s)
 
     fit = sub.add_parser("fit", help="run only the fit step")
-    fit.add_argument("input")
-    fit.add_argument("output")
+    add_step_io(fit)
     fit.add_argument("--size", type=int, default=DEFAULT_SIZE)
 
     pal = sub.add_parser("palette", help="run only the palette-snap step")
-    pal.add_argument("input")
-    pal.add_argument("output")
+    add_step_io(pal)
     pal.add_argument("--palette", required=True, dest="palette_path")
 
     return p
@@ -97,23 +104,41 @@ def _cmd_background(args: argparse.Namespace) -> int:
     return _dispatch_pipeline(cfg, args, run)
 
 
-def _cmd_step(args: argparse.Namespace) -> int:
-    img = imageio.load(args.input)
+def _build_step_runner(args: argparse.Namespace):
     if args.cmd == "bg-remove":
-        out = steps.bg_remove(img)
-    elif args.cmd == "cleanup":
-        out = steps.cleanup(img)
-    elif args.cmd == "crop-bbox":
-        out = steps.crop_bbox(img)
-    elif args.cmd == "outline":
-        out = steps.outline(img)
-    elif args.cmd == "fit":
-        out = steps.fit(img, size=args.size)
-    elif args.cmd == "palette":
+        return steps.bg_remove
+    if args.cmd == "cleanup":
+        return steps.cleanup
+    if args.cmd == "crop-bbox":
+        return steps.crop_bbox
+    if args.cmd == "outline":
+        return steps.outline
+    if args.cmd == "fit":
+        size = args.size
+        return lambda img: steps.fit(img, size=size)
+    if args.cmd == "palette":
         palette_rgb = palette.parse_hex(args.palette_path)
-        out = steps.palette_snap(img, palette_rgb=palette_rgb)
-    else:
-        raise AssertionError(f"unknown step: {args.cmd}")
+        return lambda img: steps.palette_snap(img, palette_rgb=palette_rgb)
+    raise AssertionError(f"unknown step: {args.cmd}")
+
+
+def _cmd_step(args: argparse.Namespace) -> int:
+    run = _build_step_runner(args)
+
+    if args.in_place:
+        if args.output is not None:
+            raise TogiError(
+                "--in-place does not accept an output argument"
+            )
+        return pipeline.run_path_in_place(args.input, run)
+
+    if args.output is None:
+        raise TogiError(
+            f"{args.cmd}: output path required (or pass --in-place)"
+        )
+
+    img = imageio.load(args.input)
+    out = run(img)
     imageio.save(out, args.output)
     return 0
 

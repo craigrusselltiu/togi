@@ -89,6 +89,16 @@ togi palette in.png out.png --palette palettes/omitc.hex
 togi bg-remove in.png - | togi cleanup - - | togi palette - out.png --palette omitc.hex
 ```
 
+Per-step subcommands also accept `-i`/`--in-place`. The argument may be a
+single file or a directory; with a directory, every supported image inside
+is processed in place (recursively).
+
+```sh
+togi palette -i ./scratch --palette palettes/omitc.hex   # every image in ./scratch
+togi outline -i ./scratch/foo.png                        # single file in place
+togi fit -i ./scratch --size 64
+```
+
 ## Pipelines
 
 - **sprite**: `bg-remove → cleanup → crop-bbox → fit → outline → palette`

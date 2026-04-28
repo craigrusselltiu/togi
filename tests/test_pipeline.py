@@ -113,3 +113,31 @@ def test_run_batch_in_place_missing_input_dir_errors(tmp_path):
     cfg = _cfg(tmp_path)
     with pytest.raises(TogiError, match="input directory not found"):
         pipeline.run_batch_in_place(cfg, _identity)
+
+
+def test_run_path_in_place_directory_processes_every_image(tmp_path):
+    scratch = tmp_path / "scratch"
+    _save_png(scratch / "a.png")
+    _save_png(scratch / "sub" / "b.png")
+    _save_jpg(scratch / "c.jpg")
+
+    rc = pipeline.run_path_in_place(str(scratch), _identity)
+    assert rc == 0
+    assert (scratch / "a.png").exists()
+    assert (scratch / "sub" / "b.png").exists()
+    assert (scratch / "c.png").exists()
+    assert not (scratch / "c.jpg").exists()
+
+
+def test_run_path_in_place_single_file(tmp_path):
+    target = tmp_path / "x.png"
+    _save_png(target)
+
+    rc = pipeline.run_path_in_place(str(target), _identity)
+    assert rc == 0
+    assert target.exists()
+
+
+def test_run_path_in_place_missing_path_errors(tmp_path):
+    with pytest.raises(TogiError, match="path not found"):
+        pipeline.run_path_in_place(str(tmp_path / "nope"), _identity)
