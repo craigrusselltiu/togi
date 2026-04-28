@@ -11,6 +11,10 @@ HALO_TOL = 15
 MIN_COMPONENT = 4
 ALPHA_THRESHOLD = 128
 DEFAULT_SIZE = 64
+BG_TARGET_W = 680
+BG_TARGET_H = 380
+WATERMARK_RIGHT = 100
+WATERMARK_BOTTOM = 40
 
 CROSS4 = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], dtype=bool)
 SQUARE3 = np.ones((3, 3), dtype=bool)
@@ -108,6 +112,30 @@ def fit(rgba: np.ndarray, *, size: int = DEFAULT_SIZE) -> np.ndarray:
     arr = np.array(img)
     arr[..., 3] = np.where(arr[..., 3] > ALPHA_THRESHOLD, 255, 0).astype(np.uint8)
     return np.pad(arr, ((1, 1), (1, 1), (0, 0)), constant_values=0)
+
+
+def strip_watermark(rgba: np.ndarray) -> np.ndarray:
+    h, w = rgba.shape[:2]
+    new_h = max(1, h - WATERMARK_BOTTOM)
+    new_w = max(1, w - WATERMARK_RIGHT)
+    return rgba[:new_h, :new_w].copy()
+
+
+def resize(
+    rgba: np.ndarray,
+    *,
+    target_w: int = BG_TARGET_W,
+    target_h: int = BG_TARGET_H,
+) -> np.ndarray:
+    h, w = rgba.shape[:2]
+    scale = max(target_w / w, target_h / h)
+    new_w = max(target_w, round(w * scale))
+    new_h = max(target_h, round(h * scale))
+    img = Image.fromarray(rgba, "RGBA").resize((new_w, new_h), Image.NEAREST)
+    arr = np.array(img)
+    left = (new_w - target_w) // 2
+    top = (new_h - target_h) // 2
+    return arr[top : top + target_h, left : left + target_w].copy()
 
 
 def outline(rgba: np.ndarray) -> np.ndarray:

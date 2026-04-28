@@ -130,6 +130,28 @@ def test_outline_draws_3x3_ring_around_single_opaque_pixel(make):
                 assert tuple(out[2 + dy, 2 + dx]) == (0, 0, 0, 255)
 
 
+def test_strip_watermark_crops_bottom_right(make):
+    img = make(200, 400, fill=(50, 50, 50, 255))
+    out = steps.strip_watermark(img)
+    assert out.shape == (
+        200 - steps.WATERMARK_BOTTOM,
+        400 - steps.WATERMARK_RIGHT,
+        4,
+    )
+
+
+def test_resize_cover_fits_to_target_dims(make):
+    img = make(792, 1408, fill=(40, 60, 120, 255))
+    out = steps.resize(img)
+    assert out.shape == (steps.BG_TARGET_H, steps.BG_TARGET_W, 4)
+
+
+def test_resize_upscales_too_small_input(make):
+    img = make(100, 200, fill=(10, 20, 30, 255))
+    out = steps.resize(img)
+    assert out.shape == (steps.BG_TARGET_H, steps.BG_TARGET_W, 4)
+
+
 def test_palette_snap_snaps_to_nearest_and_zeroes_transparent(make):
     img = make(4, 4)
     img[0, 0] = (210, 30, 30, 255)

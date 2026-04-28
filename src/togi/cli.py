@@ -49,7 +49,14 @@ def _build_parser() -> argparse.ArgumentParser:
             help="overwrite input in place; input may be a file or directory",
         )
 
-    for name in ("bg-remove", "cleanup", "crop-bbox", "outline"):
+    for name in (
+        "bg-remove",
+        "cleanup",
+        "crop-bbox",
+        "outline",
+        "strip-watermark",
+        "resize",
+    ):
         s = sub.add_parser(name, help=f"run only the {name} step")
         add_step_io(s)
 
@@ -118,6 +125,10 @@ def _build_step_runner(args: argparse.Namespace):
         return steps.crop_bbox
     if args.cmd == "outline":
         return steps.outline
+    if args.cmd == "strip-watermark":
+        return steps.strip_watermark
+    if args.cmd == "resize":
+        return steps.resize
     if args.cmd == "fit":
         size = args.size
         return lambda img: steps.fit(img, size=size)

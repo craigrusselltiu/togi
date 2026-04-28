@@ -54,7 +54,7 @@ togi sprite -i                       # process every image in input/ in place
 togi sprite -i panda.png             # process raw/panda.png in place
 togi sprite -i path/to/file.png      # process the given path in place
 
-togi background                      # background pipeline (no crop/resize/outline)
+togi background                      # background pipeline (strip watermark + resize to 680x380)
 togi background saloon.png
 togi background -i                   # batch in place
 togi background -i saloon.png        # single in place
@@ -84,6 +84,8 @@ togi cleanup in.png out.png
 togi crop-bbox in.png out.png
 togi fit in.png out.png --size 64
 togi outline in.png out.png
+togi strip-watermark in.png out.png
+togi resize in.png out.png
 togi palette in.png out.png --palette palettes/omitc.hex
 
 togi bg-remove in.png - | togi cleanup - - | togi palette - out.png --palette omitc.hex
@@ -107,4 +109,4 @@ without a config file.
 ## Pipelines
 
 - **sprite**: `bg-remove → cleanup → crop-bbox → fit → outline → palette`
-- **background**: `bg-remove → cleanup → palette`
+- **background**: `strip-watermark → resize → palette` (output is `680 × 380`)

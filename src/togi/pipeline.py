@@ -28,8 +28,8 @@ def sprite_pipeline(
 def background_pipeline(
     img: np.ndarray, *, palette_rgb: np.ndarray
 ) -> np.ndarray:
-    img = steps.bg_remove(img)
-    img = steps.cleanup(img)
+    img = steps.strip_watermark(img)
+    img = steps.resize(img)
     img = steps.palette_snap(img, palette_rgb=palette_rgb)
     return img
 

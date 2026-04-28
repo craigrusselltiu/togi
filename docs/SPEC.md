@@ -101,6 +101,8 @@ togi cleanup in.png out.png
 togi crop-bbox in.png out.png
 togi fit in.png out.png --size 64
 togi outline in.png out.png
+togi strip-watermark in.png out.png
+togi resize in.png out.png
 togi palette in.png out.png --palette path/to/pal.hex
 ```
 
@@ -147,6 +149,21 @@ Given a target size `N` (e.g. 64):
 
 The 1px padding ring guarantees the outline (step 5) never eats into sprite pixels.
 
+### `strip-watermark` — chop off a fixed bottom-right region
+
+Crops the bottom `40px` and rightmost `100px` from the image. Used by the
+background pipeline to strip the Gemini watermark before resize. Sized to
+cover the typical Gemini sparkle badge with margin to spare.
+
+### `resize` — cover-fit to 680×380
+
+1. Scale the image so that *both* axes reach or exceed the target
+   (`max(target_w / w, target_h / h)`), using nearest-neighbor (preserves
+   crisp pixel edges, no anti-aliasing before palette snap).
+2. Center-crop the overflow on the longer axis.
+
+Always produces a `680 × 380` RGBA image. Used by the background pipeline.
+
 ### Step 5: `outline` — 1px black outline
 
 - Build a binary mask from alpha (`> 0`).
@@ -174,10 +191,11 @@ bg-remove -> cleanup -> crop-bbox -> fit -> outline -> palette
 ### Background pipeline (`togi background`)
 
 ```
-bg-remove -> cleanup -> palette
+strip-watermark -> resize -> palette
 ```
 
-No cropping, no resize, no outline. Preserves original canvas dimensions.
+Output is always `680 × 380`. No transparency: backgrounds are assumed to
+fill the whole canvas, so `bg-remove` and `cleanup` are not run.
 
 ## Hardcoded constants
 
@@ -188,6 +206,8 @@ No cropping, no resize, no outline. Preserves original canvas dimensions.
 - Default sprite size: `64`
 - Outline color: `#000000`
 - Outline thickness: `1px`
+- Background output size: `680 × 380`
+- Watermark strip: `100px` from right, `40px` from bottom
 
 These are not exposed as flags. If they need to change, edit the source.
 
