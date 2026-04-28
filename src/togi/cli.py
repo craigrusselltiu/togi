@@ -21,11 +21,23 @@ def _build_parser() -> argparse.ArgumentParser:
     sp.add_argument("output_name", nargs="?", default=None)
     sp.add_argument("--size", type=int, default=DEFAULT_SIZE)
     sp.add_argument("--force", action="store_true")
+    sp.add_argument(
+        "-i",
+        "--in-place",
+        action="store_true",
+        help="overwrite source files instead of writing to output/",
+    )
 
     bg = sub.add_parser("background", help="run the background pipeline")
     bg.add_argument("input_name", nargs="?", default=None)
     bg.add_argument("output_name", nargs="?", default=None)
     bg.add_argument("--force", action="store_true")
+    bg.add_argument(
+        "-i",
+        "--in-place",
+        action="store_true",
+        help="overwrite source files instead of writing to output/",
+    )
 
     for name in ("bg-remove", "cleanup", "crop-bbox", "outline"):
         s = sub.add_parser(name, help=f"run only the {name} step")
@@ -45,6 +57,24 @@ def _build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _dispatch_pipeline(
+    cfg, args: argparse.Namespace, run
+) -> int:
+    if args.in_place:
+        if args.output_name is not None:
+            raise TogiError(
+                "--in-place does not accept an output_name argument"
+            )
+        if args.input_name is None:
+            return pipeline.run_batch_in_place(cfg, run)
+        return pipeline.run_single_in_place(cfg, run, args.input_name)
+    if args.input_name is None:
+        return pipeline.run_batch(cfg, run, force=args.force)
+    return pipeline.run_single(
+        cfg, run, args.input_name, args.output_name, force=args.force
+    )
+
+
 def _cmd_sprite(args: argparse.Namespace) -> int:
     cfg = config_mod.load()
     palette_rgb = palette.parse_hex(cfg.palette)
@@ -54,11 +84,7 @@ def _cmd_sprite(args: argparse.Namespace) -> int:
             img, size=args.size, palette_rgb=palette_rgb
         )
 
-    if args.input_name is None:
-        return pipeline.run_batch(cfg, run, force=args.force)
-    return pipeline.run_single(
-        cfg, run, args.input_name, args.output_name, force=args.force
-    )
+    return _dispatch_pipeline(cfg, args, run)
 
 
 def _cmd_background(args: argparse.Namespace) -> int:
@@ -68,11 +94,7 @@ def _cmd_background(args: argparse.Namespace) -> int:
     def run(img):
         return pipeline.background_pipeline(img, palette_rgb=palette_rgb)
 
-    if args.input_name is None:
-        return pipeline.run_batch(cfg, run, force=args.force)
-    return pipeline.run_single(
-        cfg, run, args.input_name, args.output_name, force=args.force
-    )
+    return _dispatch_pipeline(cfg, args, run)
 
 
 def _cmd_step(args: argparse.Namespace) -> int:

@@ -55,17 +55,33 @@ togi sprite panda.png panda_v2.png       # raw/panda.png -> sprites/panda_v2.png
 togi sprite --size 64                    # set sprite size (default 64)
 togi sprite --force                      # reprocess even if output is newer
 
+togi sprite -i                           # batch, write back over input/
+togi sprite -i panda.png                 # process a single file in place
+togi sprite -i some/external/file.png    # in place at an arbitrary path
+
 togi background                          # process every image in input/
 togi background saloon.png               # single file
+togi background -i                       # batch in place
+togi background -i saloon.png            # single file in place
 ```
 
 ### Commands
 
-- `togi sprite [input_name] [output_name] [--size N] [--force]`
+- `togi sprite [input_name] [output_name] [--size N] [--force] [-i|--in-place]`
   Runs the full sprite pipeline. `--size` defaults to 64. Output is always `.png`.
 
-- `togi background [input_name] [output_name] [--force]`
+- `togi background [input_name] [output_name] [--force] [-i|--in-place]`
   Runs the background pipeline (no crop, no resize, no outline).
+
+### In-place mode (`-i` / `--in-place`)
+
+- With no `input_name`: walks `input/` recursively and overwrites each source.
+- With an `input_name`: resolved as a path relative to the current directory
+  if that path exists, otherwise as a name relative to `input/`. The file is
+  overwritten in place.
+- Sources whose extension is not `.png` are replaced by a sibling `.png` and
+  the original file is removed.
+- `output_name` may not be supplied with `--in-place`.
 
 ### Batch behavior
 

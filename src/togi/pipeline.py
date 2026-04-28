@@ -105,3 +105,59 @@ def run_batch(
     if not found_any:
         print(f"no input images found in {cfg.input}", file=sys.stderr)
     return 1 if failures else 0
+
+
+def _process_in_place(
+    src: Path,
+    pipeline: Callable[[np.ndarray], np.ndarray],
+) -> None:
+    dst = src.with_suffix(".png")
+    _process_one(src, dst, pipeline)
+    if src != dst and src.exists():
+        src.unlink()
+
+
+def run_single_in_place(
+    cfg: Config,
+    pipeline: Callable[[np.ndarray], np.ndarray],
+    name_or_path: str,
+) -> int:
+    given = Path(name_or_path)
+    if given.exists():
+        src = given
+    else:
+        src = cfg.input / name_or_path
+        if not src.exists():
+            raise TogiError(f"input file not found: {given}")
+    try:
+        _process_in_place(src, pipeline)
+    except TogiError as e:
+        print(f"{src}: {e}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def run_batch_in_place(
+    cfg: Config,
+    pipeline: Callable[[np.ndarray], np.ndarray],
+) -> int:
+    if not cfg.input.exists():
+        raise TogiError(f"input directory not found: {cfg.input}")
+
+    failures = 0
+    found_any = False
+    for src in sorted(cfg.input.rglob("*")):
+        if not src.is_file():
+            continue
+        if src.suffix.lower() not in SUPPORTED_EXTS:
+            continue
+        found_any = True
+        try:
+            _process_in_place(src, pipeline)
+        except TogiError as e:
+            print(f"{src}: {e}", file=sys.stderr)
+            failures += 1
+
+    if not found_any:
+        print(f"no input images found in {cfg.input}", file=sys.stderr)
+    return 1 if failures else 0
