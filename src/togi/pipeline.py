@@ -105,3 +105,83 @@ def run_batch(
     if not found_any:
         print(f"no input images found in {cfg.input}", file=sys.stderr)
     return 1 if failures else 0
+
+
+def _process_in_place(
+    src: Path,
+    pipeline: Callable[[np.ndarray], np.ndarray],
+) -> None:
+    dst = src.with_suffix(".png")
+    _process_one(src, dst, pipeline)
+    if src != dst and src.exists():
+        src.unlink()
+
+
+def run_single_in_place(
+    cfg: Config,
+    pipeline: Callable[[np.ndarray], np.ndarray],
+    name_or_path: str,
+) -> int:
+    given = Path(name_or_path)
+    if given.exists():
+        src = given
+    else:
+        src = cfg.input / name_or_path
+        if not src.exists():
+            raise TogiError(f"input file not found: {given}")
+    try:
+        _process_in_place(src, pipeline)
+    except TogiError as e:
+        print(f"{src}: {e}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def run_batch_in_place(
+    cfg: Config,
+    pipeline: Callable[[np.ndarray], np.ndarray],
+) -> int:
+    return _walk_in_place(cfg.input, pipeline)
+
+
+def _walk_in_place(
+    directory: Path,
+    pipeline: Callable[[np.ndarray], np.ndarray],
+) -> int:
+    if not directory.exists():
+        raise TogiError(f"input directory not found: {directory}")
+
+    failures = 0
+    found_any = False
+    for src in sorted(directory.rglob("*")):
+        if not src.is_file():
+            continue
+        if src.suffix.lower() not in SUPPORTED_EXTS:
+            continue
+        found_any = True
+        try:
+            _process_in_place(src, pipeline)
+        except TogiError as e:
+            print(f"{src}: {e}", file=sys.stderr)
+            failures += 1
+
+    if not found_any:
+        print(f"no input images found in {directory}", file=sys.stderr)
+    return 1 if failures else 0
+
+
+def run_path_in_place(
+    path: str,
+    pipeline: Callable[[np.ndarray], np.ndarray],
+) -> int:
+    p = Path(path)
+    if not p.exists():
+        raise TogiError(f"path not found: {p}")
+    if p.is_dir():
+        return _walk_in_place(p, pipeline)
+    try:
+        _process_in_place(p, pipeline)
+    except TogiError as e:
+        print(f"{p}: {e}", file=sys.stderr)
+        return 1
+    return 0

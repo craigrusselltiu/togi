@@ -50,8 +50,14 @@ togi sprite panda.png panda_v2.png   # rename on output
 togi sprite --size 64                # set sprite size (default 64)
 togi sprite --force                  # reprocess even if output is newer
 
+togi sprite -i                       # process every image in input/ in place
+togi sprite -i panda.png             # process raw/panda.png in place
+togi sprite -i path/to/file.png      # process the given path in place
+
 togi background                      # background pipeline (no crop/resize/outline)
 togi background saloon.png
+togi background -i                   # batch in place
+togi background -i saloon.png        # single in place
 ```
 
 Filenames passed on the CLI are relative to `input/` and `output/`. Output is
@@ -60,6 +66,12 @@ are mirrored.
 
 By default, files are skipped when `output/foo.png` is newer than the input.
 `--force` reprocesses everything.
+
+With `-i`/`--in-place`, files are written back over their source location and
+no `output_name` may be supplied. Non-`.png` sources (e.g. `.jpg`) are replaced
+by a sibling `.png` (the original is removed). When `-i` is given a single
+argument, it is resolved as a path relative to the current directory if that
+path exists, otherwise as a name relative to `input/`.
 
 ### Per-step subcommands
 
@@ -76,6 +88,21 @@ togi palette in.png out.png --palette palettes/omitc.hex
 
 togi bg-remove in.png - | togi cleanup - - | togi palette - out.png --palette omitc.hex
 ```
+
+Per-step subcommands also accept `-i`/`--in-place`. The argument may be a
+single file or a directory; with a directory, every supported image inside
+is processed in place (recursively).
+
+```sh
+togi palette -i ./scratch                                # uses palette from togi.toml
+togi palette -i ./scratch --palette palettes/other.hex   # override palette
+togi outline -i ./scratch/foo.png                        # single file in place
+togi fit -i ./scratch --size 64
+```
+
+`--palette` on `togi palette` is optional: when omitted it falls back to the
+palette in `togi.toml`. Pass `--palette` explicitly to override it or to run
+without a config file.
 
 ## Pipelines
 

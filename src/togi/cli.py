@@ -21,28 +21,70 @@ def _build_parser() -> argparse.ArgumentParser:
     sp.add_argument("output_name", nargs="?", default=None)
     sp.add_argument("--size", type=int, default=DEFAULT_SIZE)
     sp.add_argument("--force", action="store_true")
+    sp.add_argument(
+        "-i",
+        "--in-place",
+        action="store_true",
+        help="overwrite source files instead of writing to output/",
+    )
 
     bg = sub.add_parser("background", help="run the background pipeline")
     bg.add_argument("input_name", nargs="?", default=None)
     bg.add_argument("output_name", nargs="?", default=None)
     bg.add_argument("--force", action="store_true")
+    bg.add_argument(
+        "-i",
+        "--in-place",
+        action="store_true",
+        help="overwrite source files instead of writing to output/",
+    )
+
+    def add_step_io(s: argparse.ArgumentParser) -> None:
+        s.add_argument("input")
+        s.add_argument("output", nargs="?", default=None)
+        s.add_argument(
+            "-i",
+            "--in-place",
+            action="store_true",
+            help="overwrite input in place; input may be a file or directory",
+        )
 
     for name in ("bg-remove", "cleanup", "crop-bbox", "outline"):
         s = sub.add_parser(name, help=f"run only the {name} step")
-        s.add_argument("input")
-        s.add_argument("output")
+        add_step_io(s)
 
     fit = sub.add_parser("fit", help="run only the fit step")
-    fit.add_argument("input")
-    fit.add_argument("output")
+    add_step_io(fit)
     fit.add_argument("--size", type=int, default=DEFAULT_SIZE)
 
     pal = sub.add_parser("palette", help="run only the palette-snap step")
-    pal.add_argument("input")
-    pal.add_argument("output")
-    pal.add_argument("--palette", required=True, dest="palette_path")
+    add_step_io(pal)
+    pal.add_argument(
+        "--palette",
+        default=None,
+        dest="palette_path",
+        help="palette .hex file; defaults to the palette in togi.toml",
+    )
 
     return p
+
+
+def _dispatch_pipeline(
+    cfg, args: argparse.Namespace, run
+) -> int:
+    if args.in_place:
+        if args.output_name is not None:
+            raise TogiError(
+                "--in-place does not accept an output_name argument"
+            )
+        if args.input_name is None:
+            return pipeline.run_batch_in_place(cfg, run)
+        return pipeline.run_single_in_place(cfg, run, args.input_name)
+    if args.input_name is None:
+        return pipeline.run_batch(cfg, run, force=args.force)
+    return pipeline.run_single(
+        cfg, run, args.input_name, args.output_name, force=args.force
+    )
 
 
 def _cmd_sprite(args: argparse.Namespace) -> int:
@@ -54,11 +96,7 @@ def _cmd_sprite(args: argparse.Namespace) -> int:
             img, size=args.size, palette_rgb=palette_rgb
         )
 
-    if args.input_name is None:
-        return pipeline.run_batch(cfg, run, force=args.force)
-    return pipeline.run_single(
-        cfg, run, args.input_name, args.output_name, force=args.force
-    )
+    return _dispatch_pipeline(cfg, args, run)
 
 
 def _cmd_background(args: argparse.Namespace) -> int:
@@ -68,30 +106,45 @@ def _cmd_background(args: argparse.Namespace) -> int:
     def run(img):
         return pipeline.background_pipeline(img, palette_rgb=palette_rgb)
 
-    if args.input_name is None:
-        return pipeline.run_batch(cfg, run, force=args.force)
-    return pipeline.run_single(
-        cfg, run, args.input_name, args.output_name, force=args.force
-    )
+    return _dispatch_pipeline(cfg, args, run)
+
+
+def _build_step_runner(args: argparse.Namespace):
+    if args.cmd == "bg-remove":
+        return steps.bg_remove
+    if args.cmd == "cleanup":
+        return steps.cleanup
+    if args.cmd == "crop-bbox":
+        return steps.crop_bbox
+    if args.cmd == "outline":
+        return steps.outline
+    if args.cmd == "fit":
+        size = args.size
+        return lambda img: steps.fit(img, size=size)
+    if args.cmd == "palette":
+        path = args.palette_path or config_mod.load().palette
+        palette_rgb = palette.parse_hex(path)
+        return lambda img: steps.palette_snap(img, palette_rgb=palette_rgb)
+    raise AssertionError(f"unknown step: {args.cmd}")
 
 
 def _cmd_step(args: argparse.Namespace) -> int:
+    run = _build_step_runner(args)
+
+    if args.in_place:
+        if args.output is not None:
+            raise TogiError(
+                "--in-place does not accept an output argument"
+            )
+        return pipeline.run_path_in_place(args.input, run)
+
+    if args.output is None:
+        raise TogiError(
+            f"{args.cmd}: output path required (or pass --in-place)"
+        )
+
     img = imageio.load(args.input)
-    if args.cmd == "bg-remove":
-        out = steps.bg_remove(img)
-    elif args.cmd == "cleanup":
-        out = steps.cleanup(img)
-    elif args.cmd == "crop-bbox":
-        out = steps.crop_bbox(img)
-    elif args.cmd == "outline":
-        out = steps.outline(img)
-    elif args.cmd == "fit":
-        out = steps.fit(img, size=args.size)
-    elif args.cmd == "palette":
-        palette_rgb = palette.parse_hex(args.palette_path)
-        out = steps.palette_snap(img, palette_rgb=palette_rgb)
-    else:
-        raise AssertionError(f"unknown step: {args.cmd}")
+    out = run(img)
     imageio.save(out, args.output)
     return 0
 
