@@ -94,10 +94,15 @@ single file or a directory; with a directory, every supported image inside
 is processed in place (recursively).
 
 ```sh
-togi palette -i ./scratch --palette palettes/omitc.hex   # every image in ./scratch
+togi palette -i ./scratch                                # uses palette from togi.toml
+togi palette -i ./scratch --palette palettes/other.hex   # override palette
 togi outline -i ./scratch/foo.png                        # single file in place
 togi fit -i ./scratch --size 64
 ```
+
+`--palette` on `togi palette` is optional: when omitted it falls back to the
+palette in `togi.toml`. Pass `--palette` explicitly to override it or to run
+without a config file.
 
 ## Pipelines
 

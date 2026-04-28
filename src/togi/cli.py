@@ -59,7 +59,12 @@ def _build_parser() -> argparse.ArgumentParser:
 
     pal = sub.add_parser("palette", help="run only the palette-snap step")
     add_step_io(pal)
-    pal.add_argument("--palette", required=True, dest="palette_path")
+    pal.add_argument(
+        "--palette",
+        default=None,
+        dest="palette_path",
+        help="palette .hex file; defaults to the palette in togi.toml",
+    )
 
     return p
 
@@ -117,7 +122,8 @@ def _build_step_runner(args: argparse.Namespace):
         size = args.size
         return lambda img: steps.fit(img, size=size)
     if args.cmd == "palette":
-        palette_rgb = palette.parse_hex(args.palette_path)
+        path = args.palette_path or config_mod.load().palette
+        palette_rgb = palette.parse_hex(path)
         return lambda img: steps.palette_snap(img, palette_rgb=palette_rgb)
     raise AssertionError(f"unknown step: {args.cmd}")
 
