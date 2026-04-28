@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "togi"
 version = "0.1.0"
-description = "Sharpen Gemini-generated game sprites and backgrounds into clean, palette-snapped assets."
+description = "Process Gemini-generated game sprites and backgrounds into clean, palette-snapped assets."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }

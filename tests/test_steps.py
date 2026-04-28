@@ -61,12 +61,32 @@ def test_cleanup_halo_pass_kills_near_white_adjacent_to_transparent(make):
     assert tuple(out[2, 2]) == (200, 50, 50, 255)
 
 
-def test_crop_bbox_tightens_to_opaque_region(make):
+def test_crop_bbox_square_input_yields_square_output(make):
     img = make(10, 10)
     img[3:6, 4:8] = (100, 100, 100, 255)
     out = steps.crop_bbox(img)
-    assert out.shape == (3, 4, 4)
-    assert (out[..., 3] == 255).all()
+    assert out.shape[0] == out.shape[1], "square input must yield square crop"
+    assert out.shape[0] >= 4 and out.shape[1] >= 4
+
+
+def test_crop_bbox_preserves_input_aspect_ratio(make):
+    img = make(20, 40)
+    img[5:9, 10:14] = (100, 100, 100, 255)
+    out = steps.crop_bbox(img)
+    h, w, _ = out.shape
+    assert w / h == pytest.approx(40 / 20, rel=0.1)
+
+
+def test_crop_bbox_pads_with_transparent_at_edge(make):
+    # Tall-thin subject hugging the left edge: the square-up expansion would
+    # need to extend past column 0, so the result must include transparent
+    # padding on the left.
+    img = make(20, 20)
+    img[2:18, 0:4] = (100, 100, 100, 255)
+    out = steps.crop_bbox(img)
+    assert out.shape[0] == out.shape[1]
+    assert (out[..., 3] == 0).any(), "edge crop must include transparent padding"
+    assert (out[..., 3] > 0).any()
 
 
 def test_crop_bbox_raises_on_fully_transparent(make):

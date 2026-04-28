@@ -66,7 +66,35 @@ def crop_bbox(rgba: np.ndarray) -> np.ndarray:
     cols = np.any(opaque, axis=0)
     r0, r1 = np.where(rows)[0][[0, -1]]
     c0, c1 = np.where(cols)[0][[0, -1]]
-    return rgba[r0 : r1 + 1, c0 : c1 + 1].copy()
+
+    img_h, img_w = rgba.shape[:2]
+    bbox_h = int(r1 - r0 + 1)
+    bbox_w = int(c1 - c0 + 1)
+
+    # Expand the tight bbox to the input image's aspect ratio so a square
+    # input always yields a square crop (no horizontal/vertical stretch in fit).
+    if bbox_w * img_h >= bbox_h * img_w:
+        new_w = bbox_w
+        new_h = -(-bbox_w * img_h // img_w)  # ceil
+    else:
+        new_h = bbox_h
+        new_w = -(-bbox_h * img_w // img_h)
+
+    extra_h = new_h - bbox_h
+    extra_w = new_w - bbox_w
+    top = extra_h // 2
+    left = extra_w // 2
+    nr0 = int(r0) - top
+    nc0 = int(c0) - left
+    nr1 = nr0 + new_h
+    nc1 = nc0 + new_w
+
+    out = np.zeros((new_h, new_w, 4), dtype=rgba.dtype)
+    sr0, sr1 = max(nr0, 0), min(nr1, img_h)
+    sc0, sc1 = max(nc0, 0), min(nc1, img_w)
+    if sr1 > sr0 and sc1 > sc0:
+        out[sr0 - nr0 : sr1 - nr0, sc0 - nc0 : sc1 - nc0] = rgba[sr0:sr1, sc0:sc1]
+    return out
 
 
 def fit(rgba: np.ndarray, *, size: int = DEFAULT_SIZE) -> np.ndarray:

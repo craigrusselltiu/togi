@@ -114,8 +114,9 @@ Two passes on the alpha mask:
 
 ### Step 3: `crop-bbox` — crop to non-transparent bounding box
 
-- Bounding box is the tightest rectangle containing all pixels with `alpha > 0`.
-- Crop with no padding.
+- Compute the tightest rectangle containing all pixels with `alpha > 0`.
+- Expand that rectangle to match the **input image's aspect ratio**, centered on the tight bbox center. A square input always yields a square crop, preserving subject proportions through `fit`.
+- If the expanded rectangle extends past the image edge, fill the missing region with fully transparent pixels.
 - If the image is fully transparent, error out with a clear message.
 
 ### Step 4: `fit` — resize and pad to target size
