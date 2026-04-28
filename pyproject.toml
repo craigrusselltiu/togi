@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "togi"
+version = "0.1.0"
+description = "Process Gemini-generated game sprites and backgrounds into clean, palette-snapped assets."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "pillow>=10.0",
+    "numpy>=1.26",
+    "scipy>=1.11",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+togi = "togi.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/togi"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
