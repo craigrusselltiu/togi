@@ -67,3 +67,35 @@ def test_step_without_in_place_requires_output(in_cwd, capsys):
     rc = main(["outline", "a.png"])
     assert rc == 1
     assert "output path required" in capsys.readouterr().err
+
+
+def test_step_accepts_input_output_flags(in_cwd):
+    _save_png(in_cwd / "a.png")
+    rc = main(["outline", "--input", "a.png", "--output", "b.png"])
+    assert rc == 0
+    assert (in_cwd / "b.png").exists()
+
+
+def test_palette_step_accepts_input_flag(in_cwd):
+    _write_config(in_cwd)
+    _save_png(in_cwd / "a.png")
+    rc = main(
+        ["palette", "--input", "a.png", "--output", "b.png", "--palette", "pal.hex"]
+    )
+    assert rc == 0
+    out = np.array(Image.open(in_cwd / "b.png").convert("RGBA"))
+    assert tuple(out[0, 0, :3]) == (200, 62, 62)
+
+
+def test_step_input_given_twice_errors(in_cwd, capsys):
+    _save_png(in_cwd / "a.png")
+    rc = main(["outline", "a.png", "--input", "a.png", "--output", "b.png"])
+    assert rc == 1
+    assert "input given twice" in capsys.readouterr().err
+
+
+def test_step_in_place_with_input_flag(in_cwd):
+    _save_png(in_cwd / "a.png")
+    rc = main(["outline", "-i", "--input", "a.png"])
+    assert rc == 0
+    assert (in_cwd / "a.png").exists()

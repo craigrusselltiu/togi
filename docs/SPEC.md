@@ -67,11 +67,14 @@ togi background -i saloon.png            # single file in place
 
 ### Commands
 
-- `togi sprite [input_name] [output_name] [--size N] [--force] [-i|--in-place]`
+- `togi sprite [input_name] [output_name] [--size N] [--force] [-i|--in-place] [--palette PATH] [--input DIR] [--output DIR]`
   Runs the full sprite pipeline. `--size` defaults to 64. Output is always `.png`.
+  `--palette`, `--input`, and `--output` override the corresponding values in
+  `togi.toml` for this run.
 
-- `togi background [input_name] [output_name] [--force] [-i|--in-place]`
-  Runs the background pipeline (no crop, no resize, no outline).
+- `togi background [input_name] [output_name] [--force] [-i|--in-place] [--palette PATH] [--input DIR] [--output DIR]`
+  Runs the background pipeline. `--palette`, `--input`, and `--output` override
+  the corresponding values in `togi.toml` for this run.
 
 ### In-place mode (`-i` / `--in-place`)
 
@@ -106,10 +109,11 @@ togi resize in.png out.png
 togi palette in.png out.png --palette path/to/pal.hex
 ```
 
-These can be piped:
+Inputs and outputs can also be specified via `--input` / `--output` flags
+instead of positional args. Passing both forms for the same role is an error.
 
 ```
-togi bg-remove in.png - | togi cleanup - - | togi palette - out.png --palette omitc.hex
+togi palette --input in.png --output out.png --palette path/to/pal.hex
 ```
 
 ## Pipeline steps
@@ -125,10 +129,11 @@ Each step is a pure function `(image[, params]) -> image`. All operate on RGBA.
 
 ### Step 2: `cleanup` — halo and speck removal
 
-Two passes on the alpha mask:
+Three passes on the alpha mask:
 
 1. **Halo pass**: for each pixel adjacent to a transparent pixel, re-check the white-distance with a tighter threshold (`< 15`). If it matches, make it transparent. Kills the faint anti-aliased ring left after step 1.
-2. **Speck pass**: connected-components label on the alpha mask (alpha > 0). Drop any component smaller than 4 pixels.
+2. **Interior-pocket pass**: label connected components of opaque near-white pixels (`< 15` of pure white). Drop any component larger than `200` pixels — these are negative-space pockets enclosed by the silhouette (gaps between legs, under arms, inside cloaks). Smaller components survive so eye highlights, teeth, and gun glints are preserved.
+3. **Speck pass**: connected-components label on the alpha mask (alpha > 0). Drop any component smaller than 4 pixels.
 
 ### Step 3: `crop-bbox` — crop to non-transparent bounding box
 
@@ -202,6 +207,7 @@ fill the whole canvas, so `bg-remove` and `cleanup` are not run.
 - White flood-fill tolerance: `30` (RGB Euclidean)
 - Halo cleanup tolerance: `15`
 - Min connected component size: `4` pixels
+- Max interior near-white pocket size before drop: `200` pixels
 - Alpha binarization threshold: `128`
 - Default sprite size: `64`
 - Outline color: `#000000`

@@ -49,6 +49,8 @@ togi sprite panda.png                # raw/panda.png -> sprites/panda.png
 togi sprite panda.png panda_v2.png   # rename on output
 togi sprite --size 64                # set sprite size (default 64)
 togi sprite --force                  # reprocess even if output is newer
+togi sprite --palette other.hex      # override palette from togi.toml
+togi sprite --input ./raw2 --output ./out2   # override input/output dirs
 
 togi sprite -i                       # process every image in input/ in place
 togi sprite -i panda.png             # process raw/panda.png in place
@@ -87,8 +89,14 @@ togi outline in.png out.png
 togi strip-watermark in.png out.png
 togi resize in.png out.png
 togi palette in.png out.png --palette palettes/omitc.hex
+```
 
-togi bg-remove in.png - | togi cleanup - - | togi palette - out.png --palette omitc.hex
+Inputs and outputs can also be passed as flags instead of positional args:
+
+```sh
+togi palette --input in.png --output out.png --palette palettes/omitc.hex
+togi outline --input in.png --output out.png
+togi fit --input in.png --output out.png --size 64
 ```
 
 Per-step subcommands also accept `-i`/`--in-place`. The argument may be a
