@@ -7,7 +7,6 @@ from typing import Callable
 import numpy as np
 
 from . import imageio, steps
-from .config import Config
 from .errors import TogiError
 
 SUPPORTED_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
@@ -45,10 +44,6 @@ def background_pipeline(
     return img
 
 
-def _output_path(cfg: Config, rel: Path) -> Path:
-    return cfg.output / rel.with_suffix(".png")
-
-
 def _is_up_to_date(src: Path, dst: Path) -> bool:
     return dst.exists() and dst.stat().st_mtime >= src.stat().st_mtime
 
@@ -64,18 +59,19 @@ def _process_one(
 
 
 def run_single(
-    cfg: Config,
+    input_dir: Path,
+    output_dir: Path,
     pipeline: Callable[[np.ndarray], np.ndarray],
     input_name: str,
     output_name: str | None,
     *,
     force: bool,
 ) -> int:
-    src = cfg.input / input_name
+    src = input_dir / input_name
     if not src.exists():
         raise TogiError(f"input file not found: {src}")
     rel = Path(output_name) if output_name else Path(input_name)
-    dst = cfg.output / rel.with_suffix(".png")
+    dst = output_dir / rel.with_suffix(".png")
     if not force and _is_up_to_date(src, dst):
         return 0
     try:
@@ -87,24 +83,25 @@ def run_single(
 
 
 def run_batch(
-    cfg: Config,
+    input_dir: Path,
+    output_dir: Path,
     pipeline: Callable[[np.ndarray], np.ndarray],
     *,
     force: bool,
 ) -> int:
-    if not cfg.input.exists():
-        raise TogiError(f"input directory not found: {cfg.input}")
+    if not input_dir.exists():
+        raise TogiError(f"input directory not found: {input_dir}")
 
     failures = 0
     found_any = False
-    for src in sorted(cfg.input.rglob("*")):
+    for src in sorted(input_dir.rglob("*")):
         if not src.is_file():
             continue
         if src.suffix.lower() not in SUPPORTED_EXTS:
             continue
         found_any = True
-        rel = src.relative_to(cfg.input)
-        dst = _output_path(cfg, rel)
+        rel = src.relative_to(input_dir)
+        dst = output_dir / rel.with_suffix(".png")
         if not force and _is_up_to_date(src, dst):
             continue
         try:
@@ -114,7 +111,7 @@ def run_batch(
             failures += 1
 
     if not found_any:
-        print(f"no input images found in {cfg.input}", file=sys.stderr)
+        print(f"no input images found in {input_dir}", file=sys.stderr)
     return 1 if failures else 0
 
 
@@ -129,7 +126,7 @@ def _process_in_place(
 
 
 def run_single_in_place(
-    cfg: Config,
+    input_dir: Path,
     pipeline: Callable[[np.ndarray], np.ndarray],
     name_or_path: str,
 ) -> int:
@@ -137,7 +134,7 @@ def run_single_in_place(
     if given.exists():
         src = given
     else:
-        src = cfg.input / name_or_path
+        src = input_dir / name_or_path
         if not src.exists():
             raise TogiError(f"input file not found: {given}")
     try:
@@ -149,10 +146,10 @@ def run_single_in_place(
 
 
 def run_batch_in_place(
-    cfg: Config,
+    input_dir: Path,
     pipeline: Callable[[np.ndarray], np.ndarray],
 ) -> int:
-    return _walk_in_place(cfg.input, pipeline)
+    return _walk_in_place(input_dir, pipeline)
 
 
 def _walk_in_place(

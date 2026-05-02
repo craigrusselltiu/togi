@@ -77,27 +77,31 @@ path exists, otherwise as a name relative to `input/`.
 
 ### Per-step subcommands
 
-Each pipeline step is exposed as its own subcommand for debugging. They take
-explicit paths (no config lookup) and support `-` for stdin/stdout piping:
+Each pipeline step is exposed as its own subcommand for debugging. Each one
+accepts the same input/output handling as the full pipelines: positional or
+`--input`/`--output` flag, falling back to the `input`/`output` dirs in
+`togi.toml` when omitted.
 
 ```sh
+togi outline                         # batch input/ -> output/, applying outline
+togi outline a.png                   # ./a.png -> output/a.png
+togi outline a.png b.png             # ./a.png -> ./b.png
+togi outline --input ./scratch/x.png # -> output/x.png
+togi palette --palette palettes/omitc.hex   # batch with explicit palette
+
 togi bg-remove in.png out.png
 togi cleanup in.png out.png
 togi crop-bbox in.png out.png
 togi fit in.png out.png --size 64
-togi outline in.png out.png
 togi strip-watermark in.png out.png
 togi resize in.png out.png
 togi palette in.png out.png --palette palettes/omitc.hex
 ```
 
-Inputs and outputs can also be passed as flags instead of positional args:
-
-```sh
-togi palette --input in.png --output out.png --palette palettes/omitc.hex
-togi outline --input in.png --output out.png
-togi fit --input in.png --output out.png --size 64
-```
+When `--input` (or the positional input) resolves to a directory, the step
+batches over it (mirroring subdirectories into the output dir). When it
+resolves to a single file and the output is a directory (or omitted), the
+result is written under that directory using the input's basename.
 
 Per-step subcommands also accept `-i`/`--in-place`. The argument may be a
 single file or a directory; with a directory, every supported image inside

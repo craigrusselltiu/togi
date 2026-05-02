@@ -42,7 +42,7 @@ def test_run_batch_writes_to_output_with_same_filenames(tmp_path):
     _save_png(cfg.input / "a.png")
     _save_png(cfg.input / "sub" / "b.png")
 
-    rc = pipeline.run_batch(cfg, _identity, force=False)
+    rc = pipeline.run_batch(cfg.input, cfg.output, _identity, force=False)
     assert rc == 0
     assert (cfg.output / "a.png").exists()
     assert (cfg.output / "sub" / "b.png").exists()
@@ -54,7 +54,7 @@ def test_run_batch_in_place_overwrites_sources(tmp_path):
     _save_png(cfg.input / "a.png")
     _save_png(cfg.input / "sub" / "b.png")
 
-    rc = pipeline.run_batch_in_place(cfg, _identity)
+    rc = pipeline.run_batch_in_place(cfg.input, _identity)
     assert rc == 0
     assert (cfg.input / "a.png").exists()
     assert (cfg.input / "sub" / "b.png").exists()
@@ -65,7 +65,7 @@ def test_run_batch_in_place_converts_jpg_to_png_and_removes_original(tmp_path):
     cfg = _cfg(tmp_path)
     _save_jpg(cfg.input / "a.jpg")
 
-    rc = pipeline.run_batch_in_place(cfg, _identity)
+    rc = pipeline.run_batch_in_place(cfg.input, _identity)
     assert rc == 0
     assert (cfg.input / "a.png").exists()
     assert not (cfg.input / "a.jpg").exists()
@@ -75,7 +75,7 @@ def test_run_single_in_place_resolves_filename_against_input(tmp_path):
     cfg = _cfg(tmp_path)
     _save_png(cfg.input / "panda.png")
 
-    rc = pipeline.run_single_in_place(cfg, _identity, "panda.png")
+    rc = pipeline.run_single_in_place(cfg.input, _identity, "panda.png")
     assert rc == 0
     assert (cfg.input / "panda.png").exists()
     assert not cfg.output.exists()
@@ -86,7 +86,7 @@ def test_run_single_in_place_uses_explicit_path_outside_input(tmp_path):
     target = tmp_path / "elsewhere" / "x.png"
     _save_png(target)
 
-    rc = pipeline.run_single_in_place(cfg, _identity, str(target))
+    rc = pipeline.run_single_in_place(cfg.input, _identity, str(target))
     assert rc == 0
     assert target.exists()
 
@@ -96,7 +96,7 @@ def test_run_single_in_place_jpg_becomes_png(tmp_path):
     target = tmp_path / "lone.jpg"
     _save_jpg(target)
 
-    rc = pipeline.run_single_in_place(cfg, _identity, str(target))
+    rc = pipeline.run_single_in_place(cfg.input, _identity, str(target))
     assert rc == 0
     assert (tmp_path / "lone.png").exists()
     assert not target.exists()
@@ -106,13 +106,13 @@ def test_run_single_in_place_missing_file_errors(tmp_path):
     cfg = _cfg(tmp_path)
     cfg.input.mkdir()
     with pytest.raises(TogiError, match="input file not found"):
-        pipeline.run_single_in_place(cfg, _identity, "nope.png")
+        pipeline.run_single_in_place(cfg.input, _identity, "nope.png")
 
 
 def test_run_batch_in_place_missing_input_dir_errors(tmp_path):
     cfg = _cfg(tmp_path)
     with pytest.raises(TogiError, match="input directory not found"):
-        pipeline.run_batch_in_place(cfg, _identity)
+        pipeline.run_batch_in_place(cfg.input, _identity)
 
 
 def test_run_path_in_place_directory_processes_every_image(tmp_path):

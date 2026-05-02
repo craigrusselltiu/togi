@@ -96,25 +96,23 @@ By default, a file is skipped if `output/foo.png` exists and is newer than `inpu
 
 ### Individual step subcommands (escape hatches)
 
-For debugging or one-off use, each pipeline step is exposed as its own subcommand taking explicit input/output paths (no config lookup):
+For debugging or one-off use, each pipeline step is exposed as its own
+subcommand. Inputs/outputs use the same handling as the full pipelines:
+positional args or `--input` / `--output` flags, falling back to the dirs in
+`togi.toml` when both forms are omitted. Passing both the positional and the
+flag for the same role is an error.
 
 ```
-togi bg-remove in.png out.png
-togi cleanup in.png out.png
-togi crop-bbox in.png out.png
-togi fit in.png out.png --size 64
-togi outline in.png out.png
-togi strip-watermark in.png out.png
-togi resize in.png out.png
+togi outline                                # batch input/ -> output/
+togi outline a.png                          # ./a.png -> output/a.png
 togi palette in.png out.png --palette path/to/pal.hex
-```
-
-Inputs and outputs can also be specified via `--input` / `--output` flags
-instead of positional args. Passing both forms for the same role is an error.
-
-```
 togi palette --input in.png --output out.png --palette path/to/pal.hex
+togi fit in.png out.png --size 64
 ```
+
+When the resolved input is a directory the step batches over it; when it is
+a single file and the output is a directory (or defaulted from config), the
+result is written under that directory using the input's basename.
 
 ## Pipeline steps
 

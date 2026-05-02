@@ -62,11 +62,30 @@ def test_step_in_place_rejects_output_arg(in_cwd, capsys):
     assert "--in-place" in capsys.readouterr().err
 
 
-def test_step_without_in_place_requires_output(in_cwd, capsys):
+def test_step_without_output_falls_back_to_config_output(in_cwd):
+    _write_config(in_cwd)
     _save_png(in_cwd / "a.png")
     rc = main(["outline", "a.png"])
-    assert rc == 1
-    assert "output path required" in capsys.readouterr().err
+    assert rc == 0
+    assert (in_cwd / "out" / "a.png").exists()
+
+
+def test_step_without_input_or_output_uses_config_dirs(in_cwd):
+    _write_config(in_cwd)
+    _save_png(in_cwd / "scratch" / "a.png")
+    _save_png(in_cwd / "scratch" / "sub" / "b.png")
+    rc = main(["outline"])
+    assert rc == 0
+    assert (in_cwd / "out" / "a.png").exists()
+    assert (in_cwd / "out" / "sub" / "b.png").exists()
+
+
+def test_step_without_input_uses_config_input_in_place(in_cwd):
+    _write_config(in_cwd)
+    _save_png(in_cwd / "scratch" / "a.png")
+    rc = main(["outline", "-i"])
+    assert rc == 0
+    assert (in_cwd / "scratch" / "a.png").exists()
 
 
 def test_step_accepts_input_output_flags(in_cwd):

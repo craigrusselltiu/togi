@@ -96,14 +96,15 @@ def _build_parser() -> argparse.ArgumentParser:
             "--input",
             default=None,
             dest="input_flag",
-            help="input path (file or directory); alternative to positional",
+            help="input path (file or directory); falls back to togi.toml",
         )
         s.add_argument(
             "--output",
             default=None,
             dest="output_flag",
-            help="output path; alternative to positional",
+            help="output path (file or directory); falls back to togi.toml",
         )
+        s.add_argument("--force", action="store_true")
         s.add_argument(
             "-i",
             "--in-place",
@@ -153,12 +154,17 @@ def _dispatch_pipeline(
                 "--in-place does not accept an output_name argument"
             )
         if args.input_name is None:
-            return pipeline.run_batch_in_place(cfg, run)
-        return pipeline.run_single_in_place(cfg, run, args.input_name)
+            return pipeline.run_batch_in_place(cfg.input, run)
+        return pipeline.run_single_in_place(cfg.input, run, args.input_name)
     if args.input_name is None:
-        return pipeline.run_batch(cfg, run, force=args.force)
+        return pipeline.run_batch(cfg.input, cfg.output, run, force=args.force)
     return pipeline.run_single(
-        cfg, run, args.input_name, args.output_name, force=args.force
+        cfg.input,
+        cfg.output,
+        run,
+        args.input_name,
+        args.output_name,
+        force=args.force,
     )
 
 
@@ -239,26 +245,43 @@ def _resolve_step_io(args: argparse.Namespace) -> tuple[str | None, str | None]:
 
 def _cmd_step(args: argparse.Namespace) -> int:
     run = _build_step_runner(args)
-    input_path, output_path = _resolve_step_io(args)
+    input_raw, output_raw = _resolve_step_io(args)
 
-    if input_path is None:
-        raise TogiError(f"{args.cmd}: input path required")
+    cfg = None
+
+    def get_cfg():
+        nonlocal cfg
+        if cfg is None:
+            cfg = config_mod.load()
+        return cfg
+
+    in_path = Path(input_raw) if input_raw else get_cfg().input
 
     if args.in_place:
-        if output_path is not None:
+        if output_raw is not None:
             raise TogiError(
                 "--in-place does not accept an output argument"
             )
-        return pipeline.run_path_in_place(input_path, run)
+        return pipeline.run_path_in_place(str(in_path), run)
 
-    if output_path is None:
-        raise TogiError(
-            f"{args.cmd}: output path required (or pass --in-place)"
-        )
+    out_path = Path(output_raw) if output_raw else get_cfg().output
 
-    img = imageio.load(input_path)
-    out = run(img)
-    imageio.save(out, output_path)
+    if not in_path.exists():
+        raise TogiError(f"input not found: {in_path}")
+
+    if in_path.is_dir():
+        if out_path.exists() and not out_path.is_dir():
+            raise TogiError(
+                f"output must be a directory when input is a directory: {out_path}"
+            )
+        return pipeline.run_batch(in_path, out_path, run, force=args.force)
+
+    if output_raw is None or out_path.is_dir():
+        out_path = out_path / in_path.with_suffix(".png").name
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    img = imageio.load(in_path)
+    result = run(img)
+    imageio.save(result, out_path)
     return 0
 
 
