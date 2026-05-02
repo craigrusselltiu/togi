@@ -61,6 +61,18 @@ def test_cleanup_halo_pass_kills_near_white_adjacent_to_transparent(make):
     assert tuple(out[2, 2]) == (200, 50, 50, 255)
 
 
+def test_cleanup_drops_large_interior_white_pocket_keeps_small_highlight(make):
+    img = make(40, 40, fill=(100, 100, 100, 255))
+    img[5:25, 5:25] = (255, 255, 255, 255)  # 400px interior white pocket
+    img[30, 30] = (255, 255, 255, 255)  # tiny highlight
+    img[31, 30] = (255, 255, 255, 255)
+    img[30, 31] = (255, 255, 255, 255)
+    img[31, 31] = (255, 255, 255, 255)
+    out = steps.cleanup(img)
+    assert out[10, 10, 3] == 0, "large interior white pocket must be cleared"
+    assert out[30, 30, 3] == 255, "small white highlight must survive"
+
+
 def test_crop_bbox_square_input_yields_square_output(make):
     img = make(10, 10)
     img[3:6, 4:8] = (100, 100, 100, 255)

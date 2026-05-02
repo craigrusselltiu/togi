@@ -14,23 +14,34 @@ SUPPORTED_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
 
 
 def sprite_pipeline(
-    img: np.ndarray, *, size: int, palette_rgb: np.ndarray
+    img: np.ndarray,
+    *,
+    size: int,
+    palette_rgb: np.ndarray,
+    chroma_weight: float = 1.0,
 ) -> np.ndarray:
     img = steps.bg_remove(img)
     img = steps.cleanup(img)
     img = steps.crop_bbox(img)
+    img = steps.palette_snap(
+        img, palette_rgb=palette_rgb, chroma_weight=chroma_weight
+    )
     img = steps.fit(img, size=size)
     img = steps.outline(img)
-    img = steps.palette_snap(img, palette_rgb=palette_rgb)
     return img
 
 
 def background_pipeline(
-    img: np.ndarray, *, palette_rgb: np.ndarray
+    img: np.ndarray,
+    *,
+    palette_rgb: np.ndarray,
+    chroma_weight: float = 1.0,
 ) -> np.ndarray:
     img = steps.strip_watermark(img)
     img = steps.resize(img)
-    img = steps.palette_snap(img, palette_rgb=palette_rgb)
+    img = steps.palette_snap(
+        img, palette_rgb=palette_rgb, chroma_weight=chroma_weight
+    )
     return img
 
 

@@ -9,6 +9,7 @@ from .errors import FullyTransparentError
 WHITE_TOL = 30
 HALO_TOL = 15
 MIN_COMPONENT = 4
+INTERIOR_WHITE_MAX = 200
 ALPHA_THRESHOLD = 128
 DEFAULT_SIZE = 64
 BG_TARGET_W = 680
@@ -51,6 +52,17 @@ def cleanup(rgba: np.ndarray) -> np.ndarray:
         adj = ndimage.binary_dilation(transparent, structure=CROSS4) & ~transparent
         candidates = adj & (_white_distance(out[..., :3]) < HALO_TOL)
         out[candidates] = 0
+
+    # Interior near-white pockets (limb gaps, clothing folds) survived bg-remove
+    # because they aren't corner-connected. Drop the large ones; keep small ones
+    # so eye highlights, teeth, and glints survive.
+    interior_white = (out[..., 3] > 0) & (_white_distance(out[..., :3]) < HALO_TOL)
+    if interior_white.any():
+        labels, n = ndimage.label(interior_white, structure=CROSS4)
+        if n > 0:
+            sizes = np.bincount(labels.ravel())
+            big = np.isin(labels, np.where(sizes > INTERIOR_WHITE_MAX)[0])
+            out[big & interior_white] = 0
 
     opaque = out[..., 3] > 0
     labels, n = ndimage.label(opaque, structure=CROSS4)
@@ -147,7 +159,12 @@ def outline(rgba: np.ndarray) -> np.ndarray:
     return out
 
 
-def palette_snap(rgba: np.ndarray, *, palette_rgb: np.ndarray) -> np.ndarray:
+def palette_snap(
+    rgba: np.ndarray,
+    *,
+    palette_rgb: np.ndarray,
+    chroma_weight: float = 1.0,
+) -> np.ndarray:
     from .palette import rgb_to_oklab
 
     out = rgba.copy()
@@ -161,10 +178,29 @@ def palette_snap(rgba: np.ndarray, *, palette_rgb: np.ndarray) -> np.ndarray:
     pixels = out[opaque][..., :3]
     pixels_lab = rgb_to_oklab(pixels)
     palette_lab = rgb_to_oklab(palette_rgb)
-    dists = np.linalg.norm(
-        pixels_lab[:, None, :] - palette_lab[None, :, :], axis=2
+    c_pal = (
+        np.sqrt(palette_lab[:, 1] ** 2 + palette_lab[:, 2] ** 2)
+        if chroma_weight > 0
+        else None
     )
-    nearest = palette_rgb[np.argmin(dists, axis=1)]
+
+    # Chunk to cap memory: with a 2048x2048 source and a ~70-color palette the
+    # full diff tensor would exceed 40GB. 100k pixels per chunk keeps it under
+    # ~85MB regardless of source size or palette length.
+    nearest_idx = np.empty(len(pixels), dtype=np.int32)
+    CHUNK = 100_000
+    for i in range(0, len(pixels), CHUNK):
+        j = min(i + CHUNK, len(pixels))
+        diff = pixels_lab[i:j, None, :] - palette_lab[None, :, :]
+        sq = (diff * diff).sum(axis=2)
+        if chroma_weight > 0:
+            c_src = np.sqrt(
+                pixels_lab[i:j, 1] ** 2 + pixels_lab[i:j, 2] ** 2
+            )
+            loss = np.maximum(0.0, c_src[:, None] - c_pal[None, :])
+            sq = sq + chroma_weight * (loss * loss)
+        nearest_idx[i:j] = np.argmin(sq, axis=1)
+    nearest = palette_rgb[nearest_idx]
 
     snapped = out[opaque]
     snapped[..., :3] = nearest
